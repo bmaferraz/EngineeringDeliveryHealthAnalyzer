@@ -1,14 +1,17 @@
 export interface Issue {
   issue_id: string
   title: string
+  project: string
   status: 'Open' | 'In Progress' | 'Blocked' | 'Done'
   priority: 'Low' | 'Medium' | 'High' | 'Critical'
   days_open: number
   assignee: string
   fix_version: string
   fix_version_released: boolean
+  fix_version_date: string
   space: string
   type: 'Bug' | 'Feature' | 'Task' | 'Improvement'
+  sprint?: string
 }
 
 export interface IssueWithScore extends Issue {
@@ -25,20 +28,6 @@ export interface HealthSummary {
   issues: IssueWithScore[]
 }
 
-export interface ReleaseHealth {
-  fix_version: string
-  released: boolean
-  space: string
-  score: number
-  rag: 'Red' | 'Amber' | 'Green'
-  total_issues: number
-  open_issues: number
-  in_progress_issues: number
-  blocked_issues: number
-  done_issues: number
-  bottleneck_count: number
-}
-
 export interface ApiResponse<T> {
   data: T
   meta: { generated_at: string }
@@ -49,4 +38,8 @@ export type WorkloadDistribution = {
   High: number
   Medium: number
   Low: number
+}
+
+export interface SpaceInfo {
+  [space: string]: string[]
 }
