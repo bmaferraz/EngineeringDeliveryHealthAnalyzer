@@ -43,3 +43,7 @@ export type WorkloadDistribution = {
 export interface SpaceInfo {
   [space: string]: string[]
 }
+
+export interface ProjectMapping {
+  [name: string]: string
+}

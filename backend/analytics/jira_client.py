@@ -90,12 +90,9 @@ _PROJECT_TO_SPACE: dict[str, str] = {
 }
 
 
-def get_spaces() -> list[dict[str, str | list[str]]]:
-    """Return all known spaces with their project keys."""
-    return [
-        {"space": space, "projects": projects}
-        for space, projects in _SPACE_TO_PROJECTS.items()
-    ]
+def get_spaces() -> dict[str, list[str]]:
+    """Return all known spaces as a dict mapping space name → project keys."""
+    return {space: projects for space, projects in _SPACE_TO_PROJECTS.items()}
 
 
 def resolve_projects_for_space(space: str) -> list[str]:

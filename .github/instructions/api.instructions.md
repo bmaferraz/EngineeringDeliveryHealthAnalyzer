@@ -50,3 +50,5 @@ Define in `backend/models/`:
 - `Issue` — input shape from data file
 - `IssueWithScore` — Issue + `health_score: int` + `rag: str`
 - `HealthSummary` — `team_score: int`, `rag: str`, `issues: list[IssueWithScore]`
+
+

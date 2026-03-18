@@ -1,6 +1,7 @@
 import { useHealthScore } from './hooks/useHealthScore'
 import { useBottlenecks } from './hooks/useBottlenecks'
 import { useWorkload } from './hooks/useWorkload'
+import { useFixVersions } from './hooks/useFixVersions'
 import HealthScoreCard from './components/HealthScoreCard'
 import BottleneckTable from './components/BottleneckTable'
 import WorkloadDistribution from './components/WorkloadDistribution'
@@ -11,9 +12,6 @@ import { useEffect, useState, useMemo } from 'react'
 import type { IssueWithScore } from './types/api'
 
 export default function App() {
-  const healthScore = useHealthScore()
-  const bottlenecks = useBottlenecks()
-  const workload = useWorkload()
   const [lastUpdated, setLastUpdated] = useState(new Date())
   const [selectedSpace, setSelectedSpace] = useState<string>('')
   const [showDashboard, setShowDashboard] = useState(false)
@@ -24,10 +22,15 @@ export default function App() {
     rag: []
   })
 
+  // Pass selectedSpace to hooks — backend handles space filtering server-side
+  const healthScore = useHealthScore(selectedSpace || undefined)
+  const bottlenecks = useBottlenecks(selectedSpace || undefined)
+  const workload = useWorkload(selectedSpace || undefined)
+
   useEffect(() => {
     const interval = setInterval(() => {
       setLastUpdated(new Date())
-    }, 5 * 60 * 1000) // Update timestamp every 5 minutes
+    }, 5 * 60 * 1000)
     return () => clearInterval(interval)
   }, [])
 
@@ -42,18 +45,33 @@ export default function App() {
     setFilters({ status: [], priority: [], sprint: [], rag: [] })
   }
 
-  // Filter data by selected space
-  const spaceFilteredHealthScore = useMemo(() => {
-    if (!healthScore.data || !selectedSpace) return healthScore
+  // Fetch fix versions for the selected space from JIRA API
+  const availableSprints = useFixVersions(selectedSpace || undefined)
 
-    const filteredIssues = healthScore.data.data.issues.filter(
-      (issue: IssueWithScore) => issue.space === selectedSpace
-    )
+  // Apply additional filters (status, priority, sprint, rag) client-side
+  const filteredHealthScore = useMemo(() => {
+    if (!healthScore.data) return healthScore
+
+    const hasFilters =
+      filters.status.length > 0 ||
+      filters.priority.length > 0 ||
+      filters.sprint.length > 0 ||
+      filters.rag.length > 0
+
+    if (!hasFilters) return healthScore
+
+    const filteredIssues = healthScore.data.data.issues.filter((issue: IssueWithScore) => {
+      if (filters.status.length > 0 && !filters.status.includes(issue.status)) return false
+      if (filters.priority.length > 0 && !filters.priority.includes(issue.priority)) return false
+      if (filters.sprint.length > 0 && !filters.sprint.includes(issue.sprint || 'Unassigned')) return false
+      if (filters.rag.length > 0 && !filters.rag.includes(issue.rag)) return false
+      return true
+    })
 
     const activeFiltered = filteredIssues.filter(i => i.status !== 'Done')
     const teamScore = activeFiltered.length === 0 ? 100
       : Math.round(activeFiltered.reduce((sum, i) => sum + i.health_score, 0) / activeFiltered.length)
-    
+
     const classifyRAG = (score: number) => {
       if (score >= 75) return 'Green'
       if (score >= 50) return 'Amber'
@@ -73,90 +91,27 @@ export default function App() {
         }
       }
     }
-  }, [healthScore, selectedSpace])
+  }, [healthScore, filters])
 
-  // Extract unique sprints from space-filtered data
-  const availableSprints = useMemo(() => {
-    if (!spaceFilteredHealthScore.data?.data.issues) return []
-    const sprints = new Set(
-      spaceFilteredHealthScore.data.data.issues
-        .map(i => i.sprint || 'Unassigned')
-        .filter(s => s)
-    )
-    return Array.from(sprints).sort()
-  }, [spaceFilteredHealthScore.data])
+  // Apply additional filters to bottlenecks (already filtered by space server-side)
+  const filteredBottlenecks = useMemo(() => {
+    if (!bottlenecks.data) return bottlenecks
 
-  // Apply additional filters to health score data
-  const filteredHealthScore = useMemo(() => {
-    if (!spaceFilteredHealthScore.data) return spaceFilteredHealthScore
-
-    const hasFilters = 
-      filters.status.length > 0 || 
-      filters.priority.length > 0 || 
-      filters.sprint.length > 0 || 
+    const hasFilters =
+      filters.status.length > 0 ||
+      filters.priority.length > 0 ||
+      filters.sprint.length > 0 ||
       filters.rag.length > 0
 
-    if (!hasFilters) return spaceFilteredHealthScore
+    if (!hasFilters) return bottlenecks
 
-    const filteredIssues = spaceFilteredHealthScore.data.data.issues.filter((issue: IssueWithScore) => {
+    const filteredData = bottlenecks.data.data.filter((issue: IssueWithScore) => {
       if (filters.status.length > 0 && !filters.status.includes(issue.status)) return false
       if (filters.priority.length > 0 && !filters.priority.includes(issue.priority)) return false
       if (filters.sprint.length > 0 && !filters.sprint.includes(issue.sprint || 'Unassigned')) return false
       if (filters.rag.length > 0 && !filters.rag.includes(issue.rag)) return false
       return true
     })
-
-    // Recalculate team score for filtered issues
-    const activeFiltered = filteredIssues.filter(i => i.status !== 'Done')
-    const teamScore = activeFiltered.length === 0 ? 100
-      : Math.round(activeFiltered.reduce((sum, i) => sum + i.health_score, 0) / activeFiltered.length)
-    
-    const classifyRAG = (score: number) => {
-      if (score >= 75) return 'Green'
-      if (score >= 50) return 'Amber'
-      return 'Red'
-    }
-
-    return {
-      ...spaceFilteredHealthScore,
-      data: {
-        ...spaceFilteredHealthScore.data,
-        data: {
-          ...spaceFilteredHealthScore.data.data,
-          team_score: teamScore,
-          rag: classifyRAG(teamScore) as 'Red' | 'Amber' | 'Green',
-          total_issues: filteredIssues.length,
-          issues: filteredIssues
-        }
-      }
-    }
-  }, [spaceFilteredHealthScore, filters])
-
-  // Apply filters to bottlenecks data
-  const filteredBottlenecks = useMemo(() => {
-    if (!bottlenecks.data) return bottlenecks
-
-    // First filter by space
-    let filteredData = bottlenecks.data.data.filter((issue: IssueWithScore) => 
-      issue.space === selectedSpace
-    )
-
-    // Then apply additional filters
-    const hasFilters = 
-      filters.status.length > 0 || 
-      filters.priority.length > 0 || 
-      filters.sprint.length > 0 || 
-      filters.rag.length > 0
-
-    if (hasFilters) {
-      filteredData = filteredData.filter((issue: IssueWithScore) => {
-        if (filters.status.length > 0 && !filters.status.includes(issue.status)) return false
-        if (filters.priority.length > 0 && !filters.priority.includes(issue.priority)) return false
-        if (filters.sprint.length > 0 && !filters.sprint.includes(issue.sprint || 'Unassigned')) return false
-        if (filters.rag.length > 0 && !filters.rag.includes(issue.rag)) return false
-        return true
-      })
-    }
 
     return {
       ...bottlenecks,
@@ -165,7 +120,7 @@ export default function App() {
         data: filteredData
       }
     }
-  }, [bottlenecks, filters, selectedSpace])
+  }, [bottlenecks, filters])
 
   // Show landing page if dashboard is not open
   if (!showDashboard) {
@@ -218,7 +173,7 @@ export default function App() {
         filters={filters} 
         onChange={setFilters} 
         availableSprints={availableSprints}
-        totalIssues={spaceFilteredHealthScore.data?.data.issues.length}
+        totalIssues={healthScore.data?.data.issues.length}
         filteredIssues={filteredHealthScore.data?.data.issues.length}
       />
 

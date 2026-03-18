@@ -8,9 +8,9 @@ router = APIRouter(prefix="/api/v1", tags=["issues"])
 
 @router.get("/issues")
 def get_issues(
-    space: str | None = Query(
+    project: str | None = Query(
         None,
-        description="Filter by space name, e.g. 'TSA-SITE', 'Voice Policy Engine 2.0', 'RCEM 3.0', 'RCEM 3.2'",
+        description="Filter by JIRA project ID, e.g. 'TSITE', 'VPE2', 'RCEM3', 'RCEM32'",
     ),
     fix_version: str | None = Query(
         None,
@@ -28,8 +28,8 @@ def get_issues(
     assignee: str | None = Query(None, description="Filter by assignee display name"),
 ) -> dict:
     issues = load_issues()
-    if space:
-        issues = [i for i in issues if i.space == space]
+    if project:
+        issues = [i for i in issues if i.project == project]
     if fix_version:
         issues = [i for i in issues if i.fix_version == fix_version]
     if status:

@@ -12,9 +12,9 @@ router = APIRouter(prefix="/api/v1", tags=["health"])
 
 @router.get("/health-score")
 def get_health_score(
-    space: str | None = Query(
+    project: str | None = Query(
         None,
-        description="Filter by space name, e.g. 'TSA-SITE', 'Voice Policy Engine 2.0', 'RCEM 3.0', 'RCEM 3.2'",
+        description="Filter by JIRA project ID, e.g. 'TSITE', 'VPE2', 'RCEM3', 'RCEM32'",
     ),
     fix_version: str | None = Query(
         None,
@@ -22,8 +22,8 @@ def get_health_score(
     ),
 ) -> dict:
     issues = load_issues()
-    if space:
-        issues = [i for i in issues if i.space == space]
+    if project:
+        issues = [i for i in issues if i.project == project]
     if fix_version:
         issues = [i for i in issues if i.fix_version == fix_version]
     team_score = compute_team_score(issues)
@@ -51,7 +51,7 @@ def get_health_score(
 
 @router.get("/health-score/by-release")
 def get_health_score_by_release(
-    space: str | None = Query(None, description="Filter by space name, e.g. 'TSA-SITE'. Omit for all spaces."),
+    project: str | None = Query(None, description="Filter by JIRA project ID, e.g. 'TSITE', 'VPE2', 'RCEM3', 'RCEM32'. Omit for all projects."),
     limit: int = Query(5, ge=1, le=50, description="Number of most recent fix versions to return (default 5)"),
 ) -> dict:
     """Return health score aggregated per fix version.
@@ -63,9 +63,9 @@ def get_health_score_by_release(
     """
     issues = load_issues()
 
-    # Optionally filter to a single space
-    if space:
-        issues = [i for i in issues if i.space == space]
+    # Optionally filter to a single project
+    if project:
+        issues = [i for i in issues if i.project == project]
 
     # Group by (space, fix_version) so same-named versions in different spaces stay separate
     groups: dict[tuple[str, str], list] = {}
