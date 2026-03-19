@@ -23,7 +23,7 @@ Returns issues from the loaded dataset. Supports optional filters.
 
 | Param | Required | Description |
 |---|---|---|
-| `space` | ❌ | Filter by space: `TSA-SITE` \| `Voice Policy Engine 2.0` \| `RCEM 3.0` \| `RCEM 3.2` |
+| `space` | ❌ | Filter by space: `TSA-SITE` \| `Voice Policy Engine 2.0` \| `RCEM 3.0` \| `AIP Risk Support` |
 | `fix_version` | ❌ | Filter by exact fix version name (see table below for examples per space) |
 | `status` | ❌ | Filter by status: `Open` \| `In Progress` \| `Blocked` \| `Done` |
 | `assignee` | ❌ | Filter by assignee display name (case-insensitive) |
@@ -35,7 +35,7 @@ Returns issues from the loaded dataset. Supports optional filters.
 | `TSA-SITE` | `SITE 14.1` · `SITE 14.1 GR` · `SITE 14.1 TMO` · `SITE 15.0` |
 | `Voice Policy Engine 2.0` | `VPE2.0.22.6.0` · `VPE2-2.0-R221001` · `VPE2-2.0-R220901` |
 | `RCEM 3.0` | `RCEM 3.0` · `RNS-Prior-Apr-2022-Releases` · `Unassigned` |
-| `RCEM 3.2` | `RCEM 3.2` · `Unassigned` |
+| `AIP Risk Support` | `RCEM 3.2` · `None` |
 
 > Use `GET /api/v1/jira/fix-versions?project=TSITE` (or `VPE2`, `RCEM3`, `RCEM32`) to get the live version list from JIRA.
 
@@ -311,6 +311,28 @@ Returns all JIRA projects visible to the configured credentials.
   { "key": "TSITE", "name": "TSA SITE" },
   { "key": "VPE2",  "name": "Voice Policy Engine 2.0" }
 ]
+```
+
+---
+
+### GET `/api/v1/jira/active-release?project={key}`
+Returns the current active (unreleased, non-archived) release for a project. The active release is the unreleased version whose release date is closest to today.
+
+**Query params:**
+
+| Param | Required | Description |
+|---|---|---|
+| `project` | ✅ | JIRA project key, e.g. `TSITE`, `VPE2`, `RCEM3`, `RCEM32` |
+
+**Response `data`:** Single version object, or **404** if no unreleased version exists.
+```json
+{
+  "id": "48536",
+  "name": "SITE 14.1 GR",
+  "released": "False",
+  "archived": "False",
+  "releaseDate": "2026-03-13"
+}
 ```
 
 ---

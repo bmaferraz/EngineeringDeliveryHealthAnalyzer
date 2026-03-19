@@ -27,7 +27,8 @@ PROJECT_CONTRIBUTORS = {
     "TSA-SITE": ["Sukrutha Karthik"],
     "Voice Policy Engine 2.0": ["Roja Rameti"],
     "RCEM 3.0": ["Sumit Kumar"],
-    "RCEM 3.2": ["Chandramouli B"],
+    "RCEM 3.2": ["Bruno Alves Ferraz"],
+    "Steering 9.0": ["Chandramouli B"],
 }
 ```
 

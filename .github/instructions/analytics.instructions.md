@@ -37,7 +37,7 @@ Always filter by `space` when possible — it automatically resolves to the corr
 | `TSA-SITE` | `TSITE` |
 | `Voice Policy Engine 2.0` | `VPE2` |
 | `RCEM 3.0` | `RCEM3` |
-| `RCEM 3.2` | `RCEM32` |
+| `AIP Risk Support` | `AIPRS` |
 
 The mapping lives in `_SPACE_TO_PROJECTS` in `backend/analytics/jira_client.py`.
 

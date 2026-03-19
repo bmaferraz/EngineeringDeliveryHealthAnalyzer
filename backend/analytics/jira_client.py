@@ -78,9 +78,10 @@ _PRIORITY_MAP: dict[str, str] = {
 
 _SPACE_TO_PROJECTS: dict[str, list[str]] = {
     "TSA-SITE": ["TSITE"],
-    "Voice Policy Engine 2.0": ["VPE2"],
     "RCEM 3.0": ["RCEM3"],
-    "RCEM 3.2": ["RCEM32"],
+    "Voice Policy Engine 2.0": ["VPE2"],
+    "AIP Risk Support": ["AIPRS"],
+    "Steering 9.0": ["NTR9"],
 }
 
 _PROJECT_TO_SPACE: dict[str, str] = {
@@ -186,14 +187,20 @@ def fetch_projects() -> list[dict[str, str]]:
 
 
 def fetch_fix_versions_for_project(project_key: str, limit: int = 0) -> list[dict[str, str]]:
-    """Return fix versions for a project.
+    """Return current, past, and the single next active release for a project.
+
+    Versions are sorted by release date descending (most recent first).
+    The one nearest future-dated unreleased version is always included so the
+    currently-in-progress release is visible. All other future versions are excluded.
 
     Args:
         project_key: JIRA project key, e.g. "TSITE", "RCEM", "VPE2".
-        limit: When > 0, return the `limit` most recent non-archived versions
-               (both released and unreleased, sorted by name descending).
-               Pass 0 for all versions sorted by name ascending.
+        limit: When > 0, return only the `limit` most recent eligible versions
+               (the active upcoming release counts toward the limit).
+               Pass 0 for all eligible versions.
     """
+    from datetime import date as _date
+
     resp = requests.get(
         f"{_API_BASE}/project/{project_key}/versions",
         auth=_AUTH,
@@ -202,23 +209,92 @@ def fetch_fix_versions_for_project(project_key: str, limit: int = 0) -> list[dic
     )
     resp.raise_for_status()
     versions = resp.json()
-    all_versions = sorted(
-        [
-            {
-                "id": v["id"],
-                "name": v["name"],
-                "released": str(v.get("released", False)),
-                "archived": str(v.get("archived", False)),
-                "releaseDate": v.get("releaseDate", ""),
-            }
-            for v in versions
-        ],
-        key=lambda v: v["name"],
-    )
+
+    today = _date.today().isoformat()  # e.g. "2026-03-18"
+
+    past_or_current: list[dict] = []
+    upcoming: list[dict] = []
+
+    for v in versions:
+        if v.get("archived", False):
+            continue
+        entry = {
+            "id": v["id"],
+            "name": v["name"],
+            "released": str(v.get("released", False)),
+            "archived": str(v.get("archived", False)),
+            "releaseDate": v.get("releaseDate", ""),
+        }
+        release_date = v.get("releaseDate", "")
+        if not release_date or release_date <= today:
+            past_or_current.append(entry)
+        else:
+            upcoming.append(entry)
+
+    # Sort past/current newest-first
+    past_or_current.sort(key=lambda v: v.get("releaseDate") or "0", reverse=True)
+
+    # Include only the single nearest upcoming release (smallest future date)
+    upcoming.sort(key=lambda v: v.get("releaseDate") or "9")
+    next_release = [upcoming[0]] if upcoming else []
+
+    # Active release first, then past releases
+    eligible = next_release + past_or_current
+
     if limit > 0:
-        non_archived = [v for v in all_versions if v["archived"] == "False"]
-        return list(reversed(non_archived))[:limit]
-    return all_versions
+        return eligible[:limit]
+    return eligible
+
+
+def fetch_active_release(project_key: str) -> dict[str, str] | None:
+    """Return the current active (unreleased, non-archived) release for a project.
+
+    The active release is the unreleased version whose release date is closest
+    to today — whether the date is slightly in the past (overdue) or in the
+    future.  If no unreleased versions have a release date, the first
+    unreleased version (alphabetically) is returned as a fallback.
+
+    Returns a dict with keys ``id``, ``name``, ``released``, ``archived``,
+    ``releaseDate``, or ``None`` if every version is already released/archived.
+    """
+    from datetime import date as _date
+
+    resp = requests.get(
+        f"{_API_BASE}/project/{project_key}/versions",
+        auth=_AUTH,
+        headers=_HEADERS,
+        timeout=30,
+    )
+    resp.raise_for_status()
+    versions: list[dict] = resp.json()
+    today = _date.today().isoformat()
+
+    unreleased: list[dict] = []
+    for v in versions:
+        if v.get("archived", False) or v.get("released", False):
+            continue
+        unreleased.append({
+            "id": v["id"],
+            "name": v["name"],
+            "released": str(v.get("released", False)),
+            "archived": str(v.get("archived", False)),
+            "releaseDate": v.get("releaseDate", ""),
+        })
+
+    if not unreleased:
+        return None
+
+    # Pick the version whose releaseDate is closest to today
+    dated = [v for v in unreleased if v["releaseDate"]]
+    if dated:
+        dated.sort(key=lambda v: abs(
+            (_date.fromisoformat(v["releaseDate"]) - _date.fromisoformat(today)).days
+        ))
+        return dated[0]
+
+    # Fallback: no dates at all — return first alphabetically
+    unreleased.sort(key=lambda v: v["name"])
+    return unreleased[0]
 
 
 def fetch_users_for_project(project_key: str) -> list[dict[str, str]]:

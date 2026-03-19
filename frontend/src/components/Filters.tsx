@@ -10,7 +10,6 @@ export interface FilterOptions {
 interface FiltersProps {
   filters: FilterOptions
   onChange: (filters: FilterOptions) => void
-  availableSprints: string[]
   totalIssues?: number
   filteredIssues?: number
 }
@@ -119,7 +118,7 @@ const FilterDropdown: React.FC<DropdownProps> = ({
 }
 
 const Filters: React.FC<FiltersProps> = ({
-  filters, onChange, availableSprints, totalIssues, filteredIssues,
+  filters, onChange, totalIssues, filteredIssues,
 }) => {
   const toggleFilter = (category: keyof FilterOptions, value: string) => {
     const current = filters[category]
@@ -130,16 +129,15 @@ const Filters: React.FC<FiltersProps> = ({
   }
 
   const clearCategory = (category: keyof FilterOptions) => onChange({ ...filters, [category]: [] })
-  const clearAll = () => onChange({ status: [], priority: [], sprint: [], rag: [] })
+  const clearAll = () => onChange({ ...filters, status: [], priority: [], rag: [] })
 
   const hasActiveFilters =
     filters.status.length > 0 || filters.priority.length > 0 ||
-    filters.sprint.length > 0 || filters.rag.length > 0
+    filters.rag.length > 0
 
   const activeChips = [
     ...filters.status.map(v => ({ label: v, category: 'status' as const, value: v })),
     ...filters.priority.map(v => ({ label: v, category: 'priority' as const, value: v })),
-    ...filters.sprint.map(v => ({ label: v, category: 'sprint' as const, value: v })),
     ...filters.rag.map(v => ({ label: v, category: 'rag' as const, value: v })),
   ]
 
@@ -191,15 +189,7 @@ const Filters: React.FC<FiltersProps> = ({
           )}
         />
 
-        {availableSprints.length > 0 && (
-          <FilterDropdown
-            label="Fix Version"
-            options={availableSprints}
-            selected={filters.sprint}
-            onToggle={v => toggleFilter('sprint', v)}
-            onClear={() => clearCategory('sprint')}
-          />
-        )}
+
 
         {hasActiveFilters && totalIssues !== undefined && filteredIssues !== undefined && (
           <>

@@ -56,6 +56,7 @@ EngineeringDeliveryHealthAnalyzer/
 | GET | `/api/v1/jira/sync` | Sync issues from JIRA; params: `space` (preferred) or `project`, `fix_version`, `assignee`, `max_results` |
 | GET | `/api/v1/jira/projects` | All JIRA projects visible to the configured credentials |
 | GET | `/api/v1/jira/fix-versions` | Fix versions for a project; params: `project`, `limit` |
+| GET | `/api/v1/jira/active-release` | Current active (unreleased) release for a project; params: `project` |
 | GET | `/api/v1/jira/users` | Assignable users for a project; params: `project` |
 | GET | `/` | `{ "message": "Engineering Delivery Health Analyzer API" }` |
 

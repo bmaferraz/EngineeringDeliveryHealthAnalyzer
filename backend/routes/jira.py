@@ -6,6 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException, Query
 
 from analytics.jira_client import (
+    fetch_active_release,
     fetch_fix_versions_for_project,
     fetch_issues,
     fetch_projects,
@@ -37,10 +38,10 @@ def list_projects() -> dict:
 
 @router.get("/fix-versions")
 def list_fix_versions(
-    project: str = Query(..., description="JIRA project key: SITE | RCEM | VPE2"),
-    limit: int = Query(5, ge=1, le=50, description="Number of most recent active fix versions to return (default 5)"),
+    project: str = Query(..., description="JIRA project key: TSITE | RCEM | VPE2"),
+    limit: int = Query(10, ge=1, le=100, description="Max fix versions to return, most recent first (default 10)"),
 ) -> dict:
-    """Return the most recent active fix versions for a JIRA project."""
+    """Return the most recent non-archived fix versions for a JIRA project, sorted by release date descending."""
     try:
         versions = fetch_fix_versions_for_project(project, limit=limit)
     except Exception as exc:
@@ -48,8 +49,22 @@ def list_fix_versions(
     return make_response(versions)
 
 
+@router.get("/active-release")
+def get_active_release(
+    project: str = Query(..., description="JIRA project key: TSITE | RCEM3 | VPE2 | RCEM32"),
+) -> dict:
+    """Return the current active (unreleased) release for a project."""
+    try:
+        release = fetch_active_release(project)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"JIRA API error: {exc}") from exc
+    if release is None:
+        raise HTTPException(status_code=404, detail="No active (unreleased) release found")
+    return make_response(release)
+
+
 @router.get("/users")
-def list_users(project: str = Query(..., description="JIRA project key: SITE | RCEM | VPE2")) -> dict:
+def list_users(project: str = Query(..., description="JIRA project key: TSITE | RCEM | VPE2")) -> dict:
     """Return assignable users for a JIRA project."""
     try:
         users = fetch_users_for_project(project)

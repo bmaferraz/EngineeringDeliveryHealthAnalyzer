@@ -23,7 +23,7 @@ export interface IssueWithScore extends Issue {
 
 export interface HealthSummary {
   team_score: number
-  rag: 'Red' | 'Amber' | 'Green'
+  rag: 'Red' | 'Amber' | 'Green' | 'None'
   total_issues: number
   issues: IssueWithScore[]
 }

@@ -1,6 +1,5 @@
 import { useHealthScore } from './hooks/useHealthScore'
 import { useBottlenecks } from './hooks/useBottlenecks'
-import { useWorkload } from './hooks/useWorkload'
 import { useFixVersions } from './hooks/useFixVersions'
 import type { FixVersion } from './hooks/useFixVersions'
 import { useActiveRelease } from './hooks/useActiveRelease'
@@ -11,7 +10,7 @@ import Filters, { FilterOptions } from './components/Filters'
 import LandingPage from './components/LandingPage'
 import ExportPrintButtons from './components/ExportPrintButtons'
 import { useEffect, useState, useMemo } from 'react'
-import type { IssueWithScore } from './types/api'
+import type { IssueWithScore, WorkloadDistribution as WorkloadData } from './types/api'
 
 export default function App() {
   const [lastUpdated, setLastUpdated] = useState(new Date())
@@ -26,8 +25,8 @@ export default function App() {
 
   // Pass selectedSpace to hooks — backend handles space filtering server-side
   const healthScore = useHealthScore(selectedSpace || undefined)
-  const bottlenecks = useBottlenecks(selectedSpace || undefined)
-  const workload = useWorkload(selectedSpace || undefined)
+  const currentFixVersion = filters.sprint.length === 1 ? filters.sprint[0] : undefined
+  const bottlenecks = useBottlenecks(selectedSpace || undefined, currentFixVersion)
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -93,16 +92,17 @@ export default function App() {
     const filteredIssues = healthScore.data.data.issues.filter((issue: IssueWithScore) => {
       if (filters.status.length > 0 && !filters.status.includes(issue.status)) return false
       if (filters.priority.length > 0 && !filters.priority.includes(issue.priority)) return false
-      if (filters.sprint.length > 0 && !filters.sprint.includes(issue.sprint || 'Unassigned')) return false
+      if (filters.sprint.length > 0 && !filters.sprint.includes(issue.fix_version || 'Unassigned')) return false
       if (filters.rag.length > 0 && !filters.rag.includes(issue.rag)) return false
       return true
     })
 
     const activeFiltered = filteredIssues.filter(i => i.status !== 'Done')
-    const teamScore = activeFiltered.length === 0 ? 100
+    const teamScore = activeFiltered.length === 0 ? 0
       : Math.round(activeFiltered.reduce((sum, i) => sum + i.health_score, 0) / activeFiltered.length)
 
     const classifyRAG = (score: number) => {
+      if (filteredIssues.length === 0) return 'None'
       if (score >= 75) return 'Green'
       if (score >= 50) return 'Amber'
       return 'Red'
@@ -115,7 +115,7 @@ export default function App() {
         data: {
           ...healthScore.data.data,
           team_score: teamScore,
-          rag: classifyRAG(teamScore) as 'Red' | 'Amber' | 'Green',
+          rag: classifyRAG(teamScore) as 'Red' | 'Amber' | 'Green' | 'None',
           total_issues: filteredIssues.length,
           issues: filteredIssues
         }
@@ -138,7 +138,7 @@ export default function App() {
     const filteredData = bottlenecks.data.data.filter((issue: IssueWithScore) => {
       if (filters.status.length > 0 && !filters.status.includes(issue.status)) return false
       if (filters.priority.length > 0 && !filters.priority.includes(issue.priority)) return false
-      if (filters.sprint.length > 0 && !filters.sprint.includes(issue.sprint || 'Unassigned')) return false
+      if (filters.sprint.length > 0 && !filters.sprint.includes(issue.fix_version || 'Unassigned')) return false
       if (filters.rag.length > 0 && !filters.rag.includes(issue.rag)) return false
       return true
     })
@@ -151,6 +151,16 @@ export default function App() {
       }
     }
   }, [bottlenecks, filters])
+
+  // Derive workload from already-filtered health score issues (stays in sync)
+  const filteredWorkload = useMemo((): WorkloadData => {
+    const issues = (filteredHealthScore.data?.data.issues ?? []).filter(
+      (i: IssueWithScore) => i.status !== 'Done',
+    )
+    const dist: WorkloadData = { Critical: 0, High: 0, Medium: 0, Low: 0 }
+    issues.forEach((i: IssueWithScore) => { dist[i.priority]++ })
+    return dist
+  }, [filteredHealthScore])
 
   // Show landing page if dashboard is not open
   if (!showDashboard) {
@@ -236,10 +246,15 @@ export default function App() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <HealthScoreCard {...filteredHealthScore} />
-        <WorkloadDistribution {...workload} selectedPriorities={filters.priority} />
+        <WorkloadDistribution workload={filteredWorkload} selectedPriorities={filters.priority} />
       </div>
 
-      <BottleneckTable {...filteredBottlenecks} />
+      <BottleneckTable
+        {...filteredBottlenecks}
+        isCompletedRelease={
+          !!(currentRelease?.released && currentRelease.releaseDate && new Date(currentRelease.releaseDate) <= new Date())
+        }
+      />
     </div>
   )
 }

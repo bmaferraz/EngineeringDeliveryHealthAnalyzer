@@ -10,7 +10,7 @@ export interface UseBottlenecksResult {
   error: string | null
 }
 
-export function useBottlenecks(space?: string): UseBottlenecksResult {
+export function useBottlenecks(space?: string, fixVersion?: string): UseBottlenecksResult {
   const [data, setData] = useState<ApiResponse<IssueWithScore[]> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -28,6 +28,9 @@ export function useBottlenecks(space?: string): UseBottlenecksResult {
         return
       }
       params.set('project', projectId)
+    }
+    if (fixVersion) {
+      params.set('fix_version', fixVersion)
     }
     const qs = params.toString()
     const url = `${API_BASE}/api/v1/bottlenecks${qs ? `?${qs}` : ''}`
@@ -47,7 +50,7 @@ export function useBottlenecks(space?: string): UseBottlenecksResult {
     const interval = setInterval(fetchData, 5 * 60 * 1000)
 
     return () => clearInterval(interval)
-  }, [space])
+  }, [space, fixVersion])
 
   return { data, loading, error }
 }

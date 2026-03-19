@@ -7,18 +7,21 @@ const RAG_BORDER: Record<string, string> = {
   Red: 'border-red-500',
   Amber: 'border-amber-400',
   Green: 'border-green-500',
+  None: 'border-gray-300',
 }
 
 const RAG_TEXT: Record<string, string> = {
   Red: 'text-red-500',
   Amber: 'text-amber-500',
   Green: 'text-green-500',
+  None: 'text-gray-400',
 }
 
 const RAG_BG: Record<string, string> = {
   Red: 'bg-red-500',
   Amber: 'bg-amber-400',
   Green: 'bg-green-500',
+  None: 'bg-gray-300',
 }
 
 const HealthScoreCard: React.FC<HealthScoreCardProps> = ({ data, loading, error }) => {
@@ -52,7 +55,7 @@ const HealthScoreCard: React.FC<HealthScoreCardProps> = ({ data, loading, error 
             <span
               className={`inline-block px-4 py-1.5 rounded-full text-white text-base font-semibold ${RAG_BG[rag]}`}
             >
-              {rag}
+              {rag === 'None' ? 'N/A' : rag}
             </span>
             <p className="text-base text-gray-500">
               {total_issues} total · {activeIssues} active
