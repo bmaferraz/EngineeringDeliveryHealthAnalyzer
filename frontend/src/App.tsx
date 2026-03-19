@@ -2,6 +2,8 @@ import { useHealthScore } from './hooks/useHealthScore'
 import { useBottlenecks } from './hooks/useBottlenecks'
 import { useWorkload } from './hooks/useWorkload'
 import { useFixVersions } from './hooks/useFixVersions'
+import type { FixVersion } from './hooks/useFixVersions'
+import { useActiveRelease } from './hooks/useActiveRelease'
 import HealthScoreCard from './components/HealthScoreCard'
 import BottleneckTable from './components/BottleneckTable'
 import WorkloadDistribution from './components/WorkloadDistribution'
@@ -34,8 +36,12 @@ export default function App() {
     return () => clearInterval(interval)
   }, [])
 
-  const handleViewDetails = (space: string) => {
+  const handleViewDetails = (space: string, release?: string) => {
     setSelectedSpace(space)
+    setFilters(f => ({
+      ...f,
+      sprint: release ? [release] : [],
+    }))
     setShowDashboard(true)
   }
 
@@ -46,7 +52,31 @@ export default function App() {
   }
 
   // Fetch fix versions for the selected space from JIRA API
-  const availableSprints = useFixVersions(selectedSpace || undefined)
+  const fixVersions = useFixVersions(selectedSpace || undefined)
+  const availableSprints = fixVersions.map(v => v.name)
+
+  // Fetch the active (unreleased) release from the dedicated JIRA API
+  const activeRelease = useActiveRelease(selectedSpace || undefined)
+
+  // Auto-select the active release as the sprint filter when entering the dashboard
+  // (only if no sprint was explicitly passed from the landing page)
+  useEffect(() => {
+    if (activeRelease && filters.sprint.length === 0) {
+      setFilters(f => ({ ...f, sprint: [activeRelease.name] }))
+    }
+  }, [activeRelease]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Derive current release: prefer the active sprint filter, else the active release from API.
+  const currentRelease = useMemo((): FixVersion | null => {
+    if (filters.sprint.length === 1) {
+      return (
+        fixVersions.find(v => v.name === filters.sprint[0]) ??
+        { name: filters.sprint[0], released: false, releaseDate: '' }
+      )
+    }
+    // No sprint filter — show the active release from the dedicated API
+    return activeRelease
+  }, [fixVersions, filters.sprint, activeRelease])
 
   // Apply additional filters (status, priority, sprint, rag) client-side
   const filteredHealthScore = useMemo(() => {
@@ -147,6 +177,34 @@ export default function App() {
             </div>
             <p className="text-gray-500 mt-1">Real-time delivery risk and workload visibility</p>
             <p className="text-sm text-blue-600 font-semibold mt-1">Current Space: {selectedSpace}</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-sm text-gray-500">Release Version:</span>
+              <select
+                value={currentRelease?.name ?? ''}
+                onChange={e => {
+                  const name = e.target.value
+                  setFilters(f => ({ ...f, sprint: name ? [name] : [] }))
+                }}
+                className="text-sm font-semibold text-gray-700 border border-gray-300 rounded-md px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 print:border-0"
+              >
+                {availableSprints.map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+              {currentRelease && (
+                currentRelease.released && currentRelease.releaseDate && new Date(currentRelease.releaseDate) <= new Date() ? (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                    Completed{currentRelease.releaseDate ? ` · ${currentRelease.releaseDate}` : ''}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs font-medium bg-green-50 text-green-700 px-2 py-0.5 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                    Active
+                  </span>
+                )
+              )}
+            </div>
           </div>
           <div className="flex flex-col items-end gap-3">
             <div className="text-right text-sm">
@@ -171,8 +229,7 @@ export default function App() {
 
       <Filters 
         filters={filters} 
-        onChange={setFilters} 
-        availableSprints={availableSprints}
+        onChange={setFilters}
         totalIssues={healthScore.data?.data.issues.length}
         filteredIssues={filteredHealthScore.data?.data.issues.length}
       />
